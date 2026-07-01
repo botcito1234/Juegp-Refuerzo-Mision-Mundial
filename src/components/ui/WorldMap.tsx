@@ -28,8 +28,9 @@ export const WorldMap: React.FC = () => {
   const defeatedBosses  = useGameStore((s) => s.defeatedBosses);
   const startLevel      = useGameStore((s) => s.startLevel);
   const startBoss       = useGameStore((s) => s.startBoss);
+  const currentWorld    = useGameStore((s) => s.currentWorld);
   const { playClick, playUnlock } = useAudio();
-  const [selectedWorld, setSelectedWorld] = useState<number>(1);
+  const [selectedWorld, setSelectedWorld] = useState<number>(currentWorld);
 
   const world = WORLDS[selectedWorld - 1];
   const wIdx  = selectedWorld - 1;
