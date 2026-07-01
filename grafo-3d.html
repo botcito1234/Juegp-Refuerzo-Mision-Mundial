@@ -1,0 +1,476 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <title>Misión Mundial — Grafo 3D</title>
+  <style>
+    * { margin:0; padding:0; box-sizing:border-box; }
+    body { background:#020817; overflow:hidden; font-family:'Segoe UI',system-ui,monospace; }
+    #panel {
+      position:fixed; top:16px; left:16px; z-index:10;
+      background:rgba(2,12,35,0.9); border:1px solid rgba(74,158,222,0.4);
+      border-radius:12px; padding:14px 18px; color:#c8d8f0;
+      backdrop-filter:blur(12px); box-shadow:0 0 20px rgba(74,158,222,0.15);
+      min-width:220px; max-width:280px;
+    }
+    #panel h2 { font-size:15px; color:#4a9ede; margin-bottom:3px; }
+    #panel .sub { font-size:10px; color:#3a5070; margin-bottom:10px; }
+    #node-info { font-size:12px; color:#8ab0d0; line-height:1.6; min-height:48px;
+      border-top:1px solid rgba(74,158,222,0.2); padding-top:8px; }
+    #legend {
+      position:fixed; top:16px; right:16px; z-index:10;
+      background:rgba(2,12,35,0.9); border:1px solid rgba(74,158,222,0.4);
+      border-radius:12px; padding:14px 18px; color:#c8d8f0;
+      backdrop-filter:blur(12px); font-size:11px;
+    }
+    #legend h3 { font-size:10px; color:#4a9ede; margin-bottom:7px; letter-spacing:1px; text-transform:uppercase; }
+    .leg { display:flex; align-items:center; gap:8px; margin:4px 0; color:#8ab0d0; }
+    .dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+    .bar { width:20px; height:2px; border-radius:1px; flex-shrink:0; }
+    .div { border-top:1px solid rgba(74,158,222,0.15); margin:8px 0; }
+    #stats {
+      position:fixed; bottom:16px; left:16px; z-index:10;
+      background:rgba(2,12,35,0.85); border:1px solid rgba(74,158,222,0.25);
+      border-radius:8px; padding:8px 14px; color:#3a5070; font-size:11px;
+    }
+    #stats span { color:#4a9ede; }
+    #hint {
+      position:fixed; bottom:16px; right:16px; z-index:10;
+      background:rgba(2,12,35,0.85); border:1px solid rgba(74,158,222,0.25);
+      border-radius:8px; padding:8px 14px; color:#3a5070; font-size:10px; line-height:1.8;
+    }
+  </style>
+</head>
+<body>
+
+<div id="panel">
+  <h2>🌍 Misión Mundial</h2>
+  <div class="sub">Grafo 3D del Codebase · TypeScript + React</div>
+  <div id="node-info"><span style="color:#2a4060">Haz clic en un nodo para ver detalles</span></div>
+</div>
+
+<div id="legend">
+  <h3>Nodos</h3>
+  <div class="leg"><div class="dot" style="background:#4a9ede"></div>Function</div>
+  <div class="leg"><div class="dot" style="background:#f5c518"></div>Variable</div>
+  <div class="leg"><div class="dot" style="background:#e8762b"></div>File</div>
+  <div class="leg"><div class="dot" style="background:#c084fc"></div>Interface</div>
+  <div class="leg"><div class="dot" style="background:#4caf50"></div>Folder / Project</div>
+  <div class="leg"><div class="dot" style="background:#f87171"></div>Type</div>
+  <div class="leg"><div class="dot" style="background:#475569"></div>Module / Section</div>
+  <div class="div"></div>
+  <h3>Aristas</h3>
+  <div class="leg"><div class="bar" style="background:#4a9ede"></div>CALLS</div>
+  <div class="leg"><div class="bar" style="background:#f5c518"></div>DEFINES</div>
+  <div class="leg"><div class="bar" style="background:#4caf50"></div>IMPORTS</div>
+  <div class="leg"><div class="bar" style="background:#e8762b"></div>CONTAINS</div>
+  <div class="leg"><div class="bar" style="background:#c084fc"></div>IMPLEMENTS</div>
+</div>
+
+<div id="stats"><span>220</span> nodos &nbsp;·&nbsp; <span>430</span> aristas &nbsp;·&nbsp; TypeScript</div>
+<div id="hint">🖱 Arrastrar: rotar &nbsp;|&nbsp; Scroll: zoom &nbsp;|&nbsp; Clic: seleccionar<br>Clic derecho: pausar rotación</div>
+
+<div id="graph"></div>
+
+<script src="https://unpkg.com/3d-force-graph@1/dist/3d-force-graph.min.js"></script>
+<script>
+const C = {
+  Function:'#4a9ede', Variable:'#f5c518', File:'#e8762b',
+  Interface:'#c084fc', Folder:'#4caf50', Project:'#22c55e',
+  Type:'#f87171', Module:'#475569', Section:'#334155'
+};
+const LC = {
+  CALLS:'#4a9ede', DEFINES:'#f5c518', IMPORTS:'#4caf50',
+  CONTAINS_FILE:'#e8762b', CONTAINS_FOLDER:'#e8762b',
+  IMPLEMENTS:'#c084fc', USAGE:'#475569', WRITES:'#f87171'
+};
+const HOT = new Set(['127','137','145','110','186','173','153','113','90','204','203']);
+
+const gData = {
+  nodes: [
+    {id:"1",  name:"E-mision-mundial",                       label:"Project"},
+    {id:"2",  name:"index.html",                             label:"File"},
+    {id:"3",  name:"README.md",                              label:"File"},
+    {id:"4",  name:"tsconfig.node.json",                     label:"File"},
+    {id:"5",  name:"vercel.json",                            label:"File"},
+    {id:"6",  name:"vite.config.ts",                         label:"File"},
+    {id:"7",  name:"App.tsx",                                label:"File"},
+    {id:"8",  name:"src",                                    label:"Folder"},
+    {id:"9",  name:"main.tsx",                               label:"File"},
+    {id:"10", name:"game.test.ts",                           label:"File"},
+    {id:"11", name:"__tests__",                              label:"Folder"},
+    {id:"12", name:"scoring.ts",                             label:"File"},
+    {id:"13", name:"utils",                                  label:"Folder"},
+    {id:"14", name:"index.ts",                               label:"File"},
+    {id:"15", name:"types",                                  label:"Folder"},
+    {id:"16", name:"gameStore.ts",                           label:"File"},
+    {id:"17", name:"store",                                  label:"Folder"},
+    {id:"18", name:"useAbandonDetection.ts",                 label:"File"},
+    {id:"19", name:"hooks",                                  label:"Folder"},
+    {id:"20", name:"useAudio.ts",                            label:"File"},
+    {id:"21", name:"useGameTimer.ts",                        label:"File"},
+    {id:"22", name:"useSpeech.ts",                           label:"File"},
+    {id:"23", name:"bossVariants.ts",                        label:"File"},
+    {id:"24", name:"config",                                 label:"Folder"},
+    {id:"25", name:"gameConfig.ts",                          label:"File"},
+    {id:"26", name:"problems.ts",                            label:"File"},
+    {id:"27", name:"worlds.ts",                              label:"File"},
+    {id:"28", name:"ExplanationPanel.tsx",                   label:"File"},
+    {id:"29", name:"ui",                                     label:"Folder"},
+    {id:"30", name:"components",                             label:"Folder"},
+    {id:"31", name:"FinalScreen.tsx",                        label:"File"},
+    {id:"32", name:"HUD.tsx",                                label:"File"},
+    {id:"33", name:"IntroScreen.tsx",                        label:"File"},
+    {id:"34", name:"LoadingScreen.tsx",                      label:"File"},
+    {id:"35", name:"Logo.tsx",                               label:"File"},
+    {id:"36", name:"QuestionPanel.tsx",                      label:"File"},
+    {id:"37", name:"TitleScreen.tsx",                        label:"File"},
+    {id:"38", name:"WarningScreen.tsx",                      label:"File"},
+    {id:"39", name:"WorldMap.tsx",                           label:"File"},
+    {id:"40", name:"BossBattle.tsx",                         label:"File"},
+    {id:"41", name:"game",                                   label:"Folder"},
+    {id:"42", name:"LevelScreen.tsx",                        label:"File"},
+    {id:"43", name:"index.html",                             label:"Module"},
+    {id:"44", name:"README.md",                              label:"Module"},
+    {id:"45", name:"Misión Mundial: Desafío Matemático",     label:"Section"},
+    {id:"46", name:"Instalación y ejecución local",          label:"Section"},
+    {id:"47", name:"Compilar para producción",               label:"Section"},
+    {id:"48", name:"Desplegar en Vercel",                    label:"Section"},
+    {id:"49", name:"Opción A — CLI",                         label:"Section"},
+    {id:"50", name:"Opción B — Dashboard Vercel",            label:"Section"},
+    {id:"51", name:"Ejecutar pruebas",                       label:"Section"},
+    {id:"52", name:"Colocar el logotipo oficial",            label:"Section"},
+    {id:"53", name:"Ajustar configuración del juego",        label:"Section"},
+    {id:"54", name:"Arquitectura técnica",                   label:"Section"},
+    {id:"55", name:"Sistema de puntuación",                  label:"Section"},
+    {id:"56", name:"Rangos finales",                         label:"Section"},
+    {id:"57", name:"Sistema de reinicio por abandono",       label:"Section"},
+    {id:"58", name:"Limitaciones conocidas",                 label:"Section"},
+    {id:"59", name:"tsconfig.node.json",                     label:"Module"},
+    {id:"60", name:"include",                                label:"Variable"},
+    {id:"61", name:"compilerOptions",                        label:"Variable"},
+    {id:"62", name:"allowSyntheticDefaultImports",           label:"Variable"},
+    {id:"63", name:"moduleResolution",                       label:"Variable"},
+    {id:"64", name:"module",                                 label:"Variable"},
+    {id:"65", name:"skipLibCheck",                           label:"Variable"},
+    {id:"66", name:"composite",                              label:"Variable"},
+    {id:"67", name:"vercel.json",                            label:"Module"},
+    {id:"68", name:"rewrites",                               label:"Variable"},
+    {id:"69", name:"framework",                              label:"Variable"},
+    {id:"70", name:"outputDirectory",                        label:"Variable"},
+    {id:"71", name:"buildCommand",                           label:"Variable"},
+    {id:"72", name:"destination",                            label:"Variable"},
+    {id:"73", name:"source",                                 label:"Variable"},
+    {id:"74", name:"vite.config.ts",                         label:"Module"},
+    {id:"75", name:"src/App.tsx",                            label:"Module"},
+    {id:"76", name:"StyleInjector",                          label:"Function"},
+    {id:"77", name:"checkWebGL",                             label:"Function"},
+    {id:"78", name:"App",                                    label:"Function"},
+    {id:"79", name:"renderScreen",                           label:"Function"},
+    {id:"80", name:"GLOBAL_CSS",                             label:"Variable"},
+    {id:"81", name:"src/main.tsx",                           label:"Module"},
+    {id:"82", name:"src/__tests__/game.test.ts",             label:"Module"},
+    {id:"83", name:"src/utils/scoring.ts",                   label:"Module"},
+    {id:"84", name:"calcSpeedBonus",                         label:"Function"},
+    {id:"85", name:"calcStreakBonus",                        label:"Function"},
+    {id:"86", name:"buildCorrectAnswerEvents",               label:"Function"},
+    {id:"87", name:"calcWorldCompleteBonus",                 label:"Function"},
+    {id:"88", name:"sumEvents",                              label:"Function"},
+    {id:"89", name:"GameRank",                               label:"Type"},
+    {id:"90", name:"computeRank",                            label:"Function"},
+    {id:"91", name:"buildFinalStats",                        label:"Function"},
+    {id:"92", name:"src/types/index.ts",                     label:"Module"},
+    {id:"93", name:"Screen",                                 label:"Type"},
+    {id:"94", name:"WorldId",                                label:"Type"},
+    {id:"95", name:"QuestionType",                           label:"Type"},
+    {id:"96", name:"Difficulty",                             label:"Type"},
+    {id:"97", name:"Option",                                 label:"Interface"},
+    {id:"98", name:"MathProblem",                            label:"Interface"},
+    {id:"99", name:"BossVariant",                            label:"Interface"},
+    {id:"100",name:"WorldConfig",                            label:"Interface"},
+    {id:"101",name:"LevelResult",                            label:"Interface"},
+    {id:"102",name:"BossAttemptResult",                      label:"Interface"},
+    {id:"103",name:"BossResult",                             label:"Interface"},
+    {id:"104",name:"WorldStats",                             label:"Interface"},
+    {id:"105",name:"GameState",                              label:"Interface"},
+    {id:"106",name:"ScoreEvent",                             label:"Interface"},
+    {id:"107",name:"FinalStats",                             label:"Interface"},
+    {id:"108",name:"src/store/gameStore.ts",                 label:"Module"},
+    {id:"109",name:"GameStore",                              label:"Interface"},
+    {id:"110",name:"goTo",                                   label:"Function"},
+    {id:"111",name:"startAdventure",                         label:"Function"},
+    {id:"112",name:"startLevel",                             label:"Function"},
+    {id:"113",name:"startBoss",                              label:"Function"},
+    {id:"114",name:"goToWorldMap",                           label:"Function"},
+    {id:"115",name:"answerQuestion",                         label:"Function"},
+    {id:"116",name:"answerBossQuestion",                     label:"Function"},
+    {id:"117",name:"nextBossQuestion",                       label:"Function"},
+    {id:"118",name:"completeWorld",                          label:"Function"},
+    {id:"119",name:"toggleAudio",                            label:"Function"},
+    {id:"120",name:"toggleVoice",                            label:"Function"},
+    {id:"121",name:"setWebGL",                               label:"Function"},
+    {id:"122",name:"resetGame",                              label:"Function"},
+    {id:"123",name:"endGame",                                label:"Function"},
+    {id:"124",name:"getCurrentProblemId",                    label:"Function"},
+    {id:"125",name:"getTotalElapsedMs",                      label:"Function"},
+    {id:"126",name:"INITIAL_STATE",                          label:"Variable"},
+    {id:"127",name:"useGameStore",                           label:"Variable"},
+    {id:"128",name:"src/hooks/useAbandonDetection.ts",       label:"Module"},
+    {id:"129",name:"useAbandonDetection",                    label:"Function"},
+    {id:"130",name:"handleVisibilityChange",                 label:"Function"},
+    {id:"131",name:"handlePageHide",                         label:"Function"},
+    {id:"132",name:"handleBeforeUnload",                     label:"Function"},
+    {id:"133",name:"src/hooks/useAudio.ts",                  label:"Module"},
+    {id:"134",name:"getCtx",                                 label:"Function"},
+    {id:"135",name:"playTone",                               label:"Function"},
+    {id:"136",name:"playChord",                              label:"Function"},
+    {id:"137",name:"useAudio",                               label:"Function"},
+    {id:"138",name:"audioCtx",                               label:"Variable"},
+    {id:"139",name:"src/hooks/useGameTimer.ts",              label:"Module"},
+    {id:"140",name:"useGameTimer",                           label:"Function"},
+    {id:"141",name:"tick",                                   label:"Function"},
+    {id:"142",name:"formatTime",                             label:"Function"},
+    {id:"143",name:"pad",                                    label:"Function"},
+    {id:"144",name:"src/hooks/useSpeech.ts",                 label:"Module"},
+    {id:"145",name:"useSpeech",                              label:"Function"},
+    {id:"146",name:"src/config/bossVariants.ts",             label:"Module"},
+    {id:"147",name:"getBossQuestions",                       label:"Function"},
+    {id:"148",name:"getShuffledBossQuestions",               label:"Function"},
+    {id:"149",name:"BOSS_VARIANTS",                          label:"Variable"},
+    {id:"150",name:"src/config/gameConfig.ts",               label:"Module"},
+    {id:"151",name:"GAME_CONFIG",                            label:"Variable"},
+    {id:"152",name:"src/config/problems.ts",                 label:"Module"},
+    {id:"153",name:"getProblemByLevel",                      label:"Function"},
+    {id:"154",name:"getProblemsByWorld",                     label:"Function"},
+    {id:"155",name:"PROBLEMS",                               label:"Variable"},
+    {id:"156",name:"src/config/worlds.ts",                   label:"Module"},
+    {id:"157",name:"getWorldById",                           label:"Function"},
+    {id:"158",name:"getWorldForLevel",                       label:"Function"},
+    {id:"159",name:"WORLDS",                                 label:"Variable"},
+    {id:"160",name:"src/components/ui/ExplanationPanel.tsx", label:"Module"},
+    {id:"161",name:"ExplanationPanelProps",                  label:"Interface"},
+    {id:"162",name:"ExplanationPanel",                       label:"Function"},
+    {id:"163",name:"styles (ExplanationPanel)",              label:"Variable"},
+    {id:"164",name:"src/components/ui/FinalScreen.tsx",      label:"Module"},
+    {id:"165",name:"formatTime (FinalScreen)",               label:"Function"},
+    {id:"166",name:"FinalScreen",                            label:"Function"},
+    {id:"167",name:"handleNewMission",                       label:"Function"},
+    {id:"168",name:"StatCard",                               label:"Function"},
+    {id:"169",name:"statStyles",                             label:"Variable"},
+    {id:"170",name:"styles (FinalScreen)",                   label:"Variable"},
+    {id:"171",name:"src/components/ui/HUD.tsx",              label:"Module"},
+    {id:"172",name:"Hearts",                                 label:"Function"},
+    {id:"173",name:"HUD",                                    label:"Function"},
+    {id:"174",name:"styles (HUD)",                           label:"Variable"},
+    {id:"175",name:"src/components/ui/IntroScreen.tsx",      label:"Module"},
+    {id:"176",name:"IntroScreen",                            label:"Function"},
+    {id:"177",name:"next",                                   label:"Function"},
+    {id:"178",name:"skip",                                   label:"Function"},
+    {id:"179",name:"STORY_SLIDES",                           label:"Variable"},
+    {id:"180",name:"styles (IntroScreen)",                   label:"Variable"},
+    {id:"181",name:"src/components/ui/LoadingScreen.tsx",    label:"Module"},
+    {id:"182",name:"LoadingScreen",                          label:"Function"},
+    {id:"183",name:"styles (LoadingScreen)",                 label:"Variable"},
+    {id:"184",name:"src/components/ui/Logo.tsx",             label:"Module"},
+    {id:"185",name:"LogoProps",                              label:"Interface"},
+    {id:"186",name:"Logo",                                   label:"Function"},
+    {id:"187",name:"src/components/ui/QuestionPanel.tsx",    label:"Module"},
+    {id:"188",name:"QuestionPanelProps",                     label:"Interface"},
+    {id:"189",name:"QuestionPanel",                          label:"Function"},
+    {id:"190",name:"handleSelect",                           label:"Function"},
+    {id:"191",name:"styles (QuestionPanel)",                 label:"Variable"},
+    {id:"192",name:"src/components/ui/TitleScreen.tsx",      label:"Module"},
+    {id:"193",name:"TitleScreen",                            label:"Function"},
+    {id:"194",name:"handleStart (TitleScreen)",              label:"Function"},
+    {id:"195",name:"styles (TitleScreen)",                   label:"Variable"},
+    {id:"196",name:"src/components/ui/WarningScreen.tsx",    label:"Module"},
+    {id:"197",name:"WarningScreen",                          label:"Function"},
+    {id:"198",name:"handleStart (WarningScreen)",            label:"Function"},
+    {id:"199",name:"handleBack",                             label:"Function"},
+    {id:"200",name:"styles (WarningScreen)",                 label:"Variable"},
+    {id:"201",name:"src/components/ui/WorldMap.tsx",         label:"Module"},
+    {id:"202",name:"WorldMap",                               label:"Function"},
+    {id:"203",name:"isWorldUnlocked",                        label:"Function"},
+    {id:"204",name:"isBossUnlocked",                         label:"Function"},
+    {id:"205",name:"handleLevel",                            label:"Function"},
+    {id:"206",name:"handleBoss",                             label:"Function"},
+    {id:"207",name:"selectWorld",                            label:"Function"},
+    {id:"208",name:"LEVEL_ICONS",                            label:"Variable"},
+    {id:"209",name:"styles (WorldMap)",                      label:"Variable"},
+    {id:"210",name:"src/components/game/BossBattle.tsx",     label:"Module"},
+    {id:"211",name:"Phase (BossBattle)",                     label:"Type"},
+    {id:"212",name:"BossBattle",                             label:"Function"},
+    {id:"213",name:"handleStart (BossBattle)",               label:"Function"},
+    {id:"214",name:"handleRetry",                            label:"Function"},
+    {id:"215",name:"handleContinue",                         label:"Function"},
+    {id:"216",name:"styles (BossBattle)",                    label:"Variable"},
+    {id:"217",name:"src/components/game/LevelScreen.tsx",    label:"Module"},
+    {id:"218",name:"Phase (LevelScreen)",                    label:"Type"},
+    {id:"219",name:"LevelScreen",                            label:"Function"},
+    {id:"220",name:"styles (LevelScreen)",                   label:"Variable"},
+  ],
+  links: [
+    // CALLS
+    {source:"78", target:"127",type:"CALLS"},{source:"78", target:"121",type:"CALLS"},
+    {source:"78", target:"77", type:"CALLS"},{source:"78", target:"129",type:"CALLS"},
+    {source:"78", target:"76", type:"CALLS"},{source:"78", target:"79", type:"CALLS"},
+    {source:"212",target:"127",type:"CALLS"},{source:"212",target:"137",type:"CALLS"},
+    {source:"212",target:"145",type:"CALLS"},{source:"212",target:"157",type:"CALLS"},
+    {source:"212",target:"116",type:"CALLS"},{source:"212",target:"117",type:"CALLS"},
+    {source:"212",target:"173",type:"CALLS"},{source:"212",target:"162",type:"CALLS"},
+    {source:"162",target:"145",type:"CALLS"},
+    {source:"166",target:"127",type:"CALLS"},{source:"166",target:"91", type:"CALLS"},
+    {source:"166",target:"90", type:"CALLS"},{source:"166",target:"186",type:"CALLS"},
+    {source:"166",target:"168",type:"CALLS"},{source:"166",target:"165",type:"CALLS"},
+    {source:"166",target:"153",type:"CALLS"},
+    {source:"173",target:"127",type:"CALLS"},{source:"173",target:"140",type:"CALLS"},
+    {source:"173",target:"172",type:"CALLS"},
+    {source:"176",target:"127",type:"CALLS"},{source:"176",target:"145",type:"CALLS"},
+    {source:"176",target:"137",type:"CALLS"},
+    {source:"219",target:"127",type:"CALLS"},{source:"219",target:"137",type:"CALLS"},
+    {source:"219",target:"145",type:"CALLS"},{source:"219",target:"153",type:"CALLS"},
+    {source:"219",target:"157",type:"CALLS"},{source:"219",target:"115",type:"CALLS"},
+    {source:"219",target:"118",type:"CALLS"},{source:"219",target:"113",type:"CALLS"},
+    {source:"219",target:"114",type:"CALLS"},{source:"219",target:"173",type:"CALLS"},
+    {source:"219",target:"189",type:"CALLS"},{source:"219",target:"162",type:"CALLS"},
+    {source:"182",target:"127",type:"CALLS"},{source:"182",target:"110",type:"CALLS"},
+    {source:"182",target:"186",type:"CALLS"},
+    {source:"189",target:"190",type:"CALLS"},
+    {source:"193",target:"127",type:"CALLS"},{source:"193",target:"137",type:"CALLS"},
+    {source:"193",target:"186",type:"CALLS"},
+    {source:"197",target:"127",type:"CALLS"},{source:"197",target:"137",type:"CALLS"},
+    {source:"202",target:"127",type:"CALLS"},{source:"202",target:"137",type:"CALLS"},
+    {source:"202",target:"173",type:"CALLS"},{source:"202",target:"203",type:"CALLS"},
+    {source:"202",target:"207",type:"CALLS"},{source:"202",target:"205",type:"CALLS"},
+    {source:"202",target:"204",type:"CALLS"},{source:"202",target:"206",type:"CALLS"},
+    // DEFINES
+    {source:"7",  target:"75", type:"DEFINES"},{source:"7",  target:"76", type:"DEFINES"},
+    {source:"7",  target:"77", type:"DEFINES"},{source:"7",  target:"78", type:"DEFINES"},
+    {source:"7",  target:"79", type:"DEFINES"},{source:"7",  target:"80", type:"DEFINES"},
+    {source:"40", target:"210",type:"DEFINES"},{source:"40", target:"211",type:"DEFINES"},
+    {source:"40", target:"212",type:"DEFINES"},{source:"40", target:"213",type:"DEFINES"},
+    {source:"40", target:"214",type:"DEFINES"},{source:"40", target:"215",type:"DEFINES"},
+    {source:"40", target:"216",type:"DEFINES"},
+    {source:"28", target:"160",type:"DEFINES"},{source:"28", target:"161",type:"DEFINES"},
+    {source:"28", target:"162",type:"DEFINES"},{source:"28", target:"163",type:"DEFINES"},
+    {source:"31", target:"164",type:"DEFINES"},{source:"31", target:"165",type:"DEFINES"},
+    {source:"31", target:"166",type:"DEFINES"},{source:"31", target:"167",type:"DEFINES"},
+    {source:"31", target:"168",type:"DEFINES"},{source:"31", target:"169",type:"DEFINES"},
+    {source:"31", target:"170",type:"DEFINES"},
+    {source:"32", target:"171",type:"DEFINES"},{source:"32", target:"172",type:"DEFINES"},
+    {source:"32", target:"173",type:"DEFINES"},{source:"32", target:"174",type:"DEFINES"},
+    {source:"33", target:"175",type:"DEFINES"},{source:"33", target:"176",type:"DEFINES"},
+    {source:"33", target:"177",type:"DEFINES"},{source:"33", target:"178",type:"DEFINES"},
+    {source:"33", target:"179",type:"DEFINES"},{source:"33", target:"180",type:"DEFINES"},
+    {source:"42", target:"217",type:"DEFINES"},{source:"42", target:"218",type:"DEFINES"},
+    {source:"42", target:"219",type:"DEFINES"},{source:"42", target:"220",type:"DEFINES"},
+    {source:"34", target:"181",type:"DEFINES"},{source:"34", target:"182",type:"DEFINES"},
+    {source:"34", target:"183",type:"DEFINES"},
+    {source:"35", target:"184",type:"DEFINES"},{source:"35", target:"185",type:"DEFINES"},
+    {source:"35", target:"186",type:"DEFINES"},
+    {source:"36", target:"187",type:"DEFINES"},{source:"36", target:"188",type:"DEFINES"},
+    {source:"36", target:"189",type:"DEFINES"},{source:"36", target:"190",type:"DEFINES"},
+    {source:"36", target:"191",type:"DEFINES"},
+    {source:"3",  target:"44", type:"DEFINES"},{source:"3",  target:"45", type:"DEFINES"},
+    {source:"3",  target:"46", type:"DEFINES"},{source:"3",  target:"47", type:"DEFINES"},
+    {source:"3",  target:"48", type:"DEFINES"},{source:"3",  target:"49", type:"DEFINES"},
+    {source:"3",  target:"50", type:"DEFINES"},{source:"3",  target:"51", type:"DEFINES"},
+    {source:"3",  target:"52", type:"DEFINES"},{source:"3",  target:"53", type:"DEFINES"},
+    {source:"3",  target:"54", type:"DEFINES"},{source:"3",  target:"55", type:"DEFINES"},
+    {source:"3",  target:"56", type:"DEFINES"},{source:"3",  target:"57", type:"DEFINES"},
+    {source:"3",  target:"58", type:"DEFINES"},
+    {source:"37", target:"192",type:"DEFINES"},{source:"37", target:"193",type:"DEFINES"},
+    {source:"37", target:"194",type:"DEFINES"},{source:"37", target:"195",type:"DEFINES"},
+    {source:"38", target:"196",type:"DEFINES"},{source:"38", target:"197",type:"DEFINES"},
+    {source:"38", target:"198",type:"DEFINES"},{source:"38", target:"199",type:"DEFINES"},
+    {source:"38", target:"200",type:"DEFINES"},
+    {source:"39", target:"201",type:"DEFINES"},{source:"39", target:"202",type:"DEFINES"},
+    {source:"39", target:"203",type:"DEFINES"},{source:"39", target:"204",type:"DEFINES"},
+    {source:"39", target:"205",type:"DEFINES"},{source:"39", target:"206",type:"DEFINES"},
+    {source:"39", target:"207",type:"DEFINES"},{source:"39", target:"208",type:"DEFINES"},
+    {source:"39", target:"209",type:"DEFINES"},
+    // IMPORTS
+    {source:"7",  target:"108",type:"IMPORTS"},{source:"7",  target:"128",type:"IMPORTS"},
+    {source:"7",  target:"181",type:"IMPORTS"},{source:"7",  target:"192",type:"IMPORTS"},
+    {source:"7",  target:"196",type:"IMPORTS"},{source:"7",  target:"175",type:"IMPORTS"},
+    {source:"7",  target:"201",type:"IMPORTS"},{source:"7",  target:"217",type:"IMPORTS"},
+    {source:"7",  target:"210",type:"IMPORTS"},{source:"7",  target:"164",type:"IMPORTS"},
+    {source:"40", target:"108",type:"IMPORTS"},{source:"40", target:"156",type:"IMPORTS"},
+    {source:"40", target:"171",type:"IMPORTS"},{source:"40", target:"160",type:"IMPORTS"},
+    {source:"40", target:"133",type:"IMPORTS"},{source:"40", target:"144",type:"IMPORTS"},
+    {source:"40", target:"150",type:"IMPORTS"},{source:"40", target:"15", type:"IMPORTS"},
+    {source:"28", target:"144",type:"IMPORTS"},{source:"28", target:"15", type:"IMPORTS"},
+    {source:"31", target:"108",type:"IMPORTS"},{source:"31", target:"83", type:"IMPORTS"},
+    {source:"31", target:"152",type:"IMPORTS"},{source:"31", target:"156",type:"IMPORTS"},
+    {source:"31", target:"184",type:"IMPORTS"},
+    {source:"32", target:"108",type:"IMPORTS"},{source:"32", target:"139",type:"IMPORTS"},
+    {source:"32", target:"150",type:"IMPORTS"},
+    {source:"33", target:"108",type:"IMPORTS"},{source:"33", target:"144",type:"IMPORTS"},
+    {source:"33", target:"133",type:"IMPORTS"},
+    {source:"42", target:"108",type:"IMPORTS"},{source:"42", target:"152",type:"IMPORTS"},
+    {source:"42", target:"156",type:"IMPORTS"},{source:"42", target:"187",type:"IMPORTS"},
+    {source:"42", target:"160",type:"IMPORTS"},{source:"42", target:"171",type:"IMPORTS"},
+    {source:"42", target:"133",type:"IMPORTS"},{source:"42", target:"144",type:"IMPORTS"},
+    {source:"42", target:"15", type:"IMPORTS"},
+    {source:"34", target:"108",type:"IMPORTS"},{source:"34", target:"184",type:"IMPORTS"},
+    {source:"35", target:"150",type:"IMPORTS"},
+    {source:"36", target:"15", type:"IMPORTS"},
+    {source:"37", target:"108",type:"IMPORTS"},{source:"37", target:"133",type:"IMPORTS"},
+    {source:"37", target:"184",type:"IMPORTS"},
+    {source:"38", target:"108",type:"IMPORTS"},{source:"38", target:"133",type:"IMPORTS"},
+    {source:"39", target:"108",type:"IMPORTS"},{source:"39", target:"156",type:"IMPORTS"},
+    {source:"39", target:"133",type:"IMPORTS"},{source:"39", target:"150",type:"IMPORTS"},
+    {source:"39", target:"15", type:"IMPORTS"},
+    // CONTAINS
+    {source:"1",  target:"2",  type:"CONTAINS_FILE"},
+    {source:"1",  target:"3",  type:"CONTAINS_FILE"},
+    {source:"1",  target:"4",  type:"CONTAINS_FILE"},
+    {source:"1",  target:"5",  type:"CONTAINS_FILE"},
+    {source:"1",  target:"6",  type:"CONTAINS_FILE"},
+    {source:"1",  target:"8",  type:"CONTAINS_FOLDER"},
+    // IMPLEMENTS
+    {source:"109",target:"105",type:"IMPLEMENTS"},
+  ]
+};
+
+const Graph = ForceGraph3D()(document.getElementById('graph'))
+  .backgroundColor('#020817')
+  .nodeLabel(n => `<div style="background:rgba(2,12,35,0.92);border:1px solid ${C[n.label]||'#333'};border-radius:6px;padding:6px 10px;color:#e0eeff;font-size:12px;max-width:220px"><div style="color:${C[n.label]};font-size:9px;font-weight:bold;letter-spacing:1px;text-transform:uppercase;margin-bottom:2px">${n.label}</div>${n.name}</div>`)
+  .nodeColor(n => C[n.label] || '#888')
+  .nodeVal(n => {
+    const b = {Project:28,Folder:10,File:6,Function:3,Interface:2.5,Variable:2,Type:2,Module:1.2,Section:0.8}[n.label]||1;
+    return HOT.has(n.id) ? b*2.8 : b;
+  })
+  .nodeOpacity(0.92)
+  .linkColor(l => LC[l.type] || '#334')
+  .linkOpacity(l => l.type==='CALLS'?0.7:l.type==='DEFINES'?0.45:l.type==='IMPORTS'?0.3:0.35)
+  .linkWidth(l => l.type==='CALLS'?1.5:l.type.startsWith('CONTAINS')?1.2:0.6)
+  .linkDirectionalArrowLength(l => ['CALLS','IMPORTS','IMPLEMENTS'].includes(l.type)?3:0)
+  .linkDirectionalArrowRelPos(1)
+  .linkDirectionalParticles(l => l.type==='CALLS'?1:0)
+  .linkDirectionalParticleWidth(1.5)
+  .linkDirectionalParticleColor(() => '#4a9ede')
+  .onNodeClick(node => {
+    document.getElementById('node-info').innerHTML =
+      `<span style="color:${C[node.label]};font-size:10px;font-weight:bold;letter-spacing:1px;text-transform:uppercase">${node.label}</span><br><b style="color:#e0eeff">${node.name}</b>`;
+    Graph.centerAt(node.x, node.y, node.z, 800);
+    Graph.zoom(6, 800);
+  })
+  .graphData(gData);
+
+// Auto-rotate
+let spin = true, angle = 0;
+setInterval(() => {
+  if (!spin) return;
+  angle += 0.004;
+  Graph.cameraPosition({ x: 620*Math.sin(angle), y: 160, z: 620*Math.cos(angle) });
+}, 33);
+
+document.addEventListener('contextmenu', e => {
+  e.preventDefault();
+  spin = !spin;
+  document.getElementById('hint').style.color = spin ? '#3a5070' : '#f5c518';
+});
+</script>
+</body>
+</html>

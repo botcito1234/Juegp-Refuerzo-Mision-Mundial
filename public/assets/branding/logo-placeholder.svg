@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 60" width="200" height="60">
+  <!-- REPLACE THIS FILE WITH THE OFFICIAL COLEGIO MUNDIAL LOGO -->
+  <!-- Place logo-light.svg (for dark backgrounds) and logo-dark.svg (for light backgrounds) in this folder -->
+  <rect width="200" height="60" rx="8" fill="#1a3a6e"/>
+  <text x="100" y="25" font-family="'Segoe UI', sans-serif" font-size="13" font-weight="700"
+        fill="#f5c518" text-anchor="middle" dominant-baseline="middle">COLEGIO MUNDIAL</text>
+  <text x="100" y="45" font-family="'Segoe UI', sans-serif" font-size="9"
+        fill="#87ceeb" text-anchor="middle" dominant-baseline="middle">Misión Mundial: Desafío Matemático</text>
+</svg>
